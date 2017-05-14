@@ -1,0 +1,6 @@
+---
+- name: ensure puppet is running
+  service:
+    name: puppet-master
+    state: started
+  become: yes

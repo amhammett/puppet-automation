@@ -1,0 +1,58 @@
+---
+- name: lookup ubuntu 16.10 ami
+  ec2_ami_find:
+    name:       "ubuntu/images/hvm-ssd/ubuntu-yakkety-16.10-amd64-server-*"
+    owner:      099720109477
+    sort:       name
+    sort_order: descending
+    sort_end:   1
+  environment: "{{environments}}"
+  register: ami_find_ubuntu
+
+- name: define ubuntu 16.10 ami
+  set_fact: meta_ubuntu_ami="{{ami_find_ubuntu.results[0].ami_id}}"
+
+- name: instance key
+  ec2_key:
+    name: "{{platform}}-{{env}}"
+    key_material: '{{dyn_ssh_orchestration_key|b64decode}}'
+    state: present
+  environment: "{{environments}}"
+
+- name: instance security group
+  ec2_group:
+    description: "access required for platform={{platform}} stack={{stack}} env={{env}}"
+    name:        "{{platform}}-{{env}}-{{stack}}"
+    rules:       "{{sg_rules}}"
+    vpc_id:      "{{meta_vpc_id}}"
+  environment: "{{environments}}"
+
+- name: existing instance
+  ec2_remote_facts:
+    filters:
+      instance-state-name: running
+      "tag:Environment":   "{{env}}"
+      "tag:Platform":      "{{platform}}"
+      "tag:Stack":         "{{stack}}"
+      vpc-id:              "{{meta_vpc_id}}"
+  environment: "{{environments}}"
+  register: ec2_remote_facts
+
+- name: provision instance
+  ec2:
+    assign_public_ip: no
+    group:            "{{platform}}-{{env}}-{{stack}}"
+    image:            "{{meta_ubuntu_ami}}"
+    instance_type:    "{{instance_type}}"
+    instance_tags:
+      Environment: "{{env}}"
+      Name:        "{{platform}}-{{env}}-{{stack}}"
+      Platform:    "{{platform}}"
+      Stack:       "{{stack}}"
+    key_name:         "{{platform}}-{{env}}"
+    vpc_subnet_id:    "{{meta_vpc_subnets|json_query(private_subnet_query)|random}}"
+    wait:             yes
+  vars:
+    private_subnet_query: "[?zone=='private'].id"
+  environment: "{{environments}}"
+  when: ec2_remote_facts.instances|length == 0

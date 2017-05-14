@@ -1,0 +1,27 @@
+---
+- name:  puppet master infrastructure and configuration
+  hosts: "tag_Platform_puppet:&tag_Environment_{{env}}:&tag_Stack_master"
+
+  gather_facts: no
+
+  vars_files:
+    - vars/common.yml
+    - vars/secrets.yml
+
+  vars:
+    environments:  "{{puppet_environments}}"
+
+  pre_tasks:
+    - name: ubuntu16/py3 hack
+      raw: test -e /usr/bin/python || (apt -y update && apt install -y python-minimal)
+      become: yes
+      register: raw_py2_install
+      changed_when: raw_py2_install.stdout != ""
+
+    - name: gather_facts
+      setup:
+
+  roles:
+    - puppet-packages
+    - puppet-master-pre-install
+    - puppet-deploy

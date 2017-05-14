@@ -1,0 +1,49 @@
+---
+- name: puppet repo
+  apt:
+    deb: "https://apt.puppetlabs.com/puppetlabs-release-{{dyn_puppet_version}}-{{ansible_distribution_release}}.deb"
+  become:   yes
+  when: false # broken on ubuntu16/ansible2
+
+- name: download puppet deb
+  get_url:
+    url: "{{item.d}}/{{item.f}}"
+    dest: /var/cache/apt/archives/{{item.f}}
+  with_items:
+    - { d: "https://apt.puppetlabs.com", f: "puppetlabs-release-{{dyn_puppet_version}}-{{ansible_distribution_release}}.deb" }
+  become: yes
+
+- name: install deb
+  apt: deb="/var/cache/apt/archives/puppetlabs-release-{{dyn_puppet_version}}-{{ansible_distribution_release}}.deb"
+  register: apt_puppet
+  become: yes
+
+- name: update ubuntu packages
+  apt:
+    update_cache:     yes
+  when: apt_puppet|changed
+  become: yes
+
+- name: install ubuntu packages
+  apt:
+    name:  "{{item}}"
+    state: present
+    update_cache:     yes
+    cache_valid_time: 3600
+  with_items:
+    - "{{puppet['packages']['apt']}}"
+  become: yes
+
+- name: update pip
+  pip:
+    name:  pip
+    state: latest
+  become: yes
+
+- name: install pips
+  pip:
+    name:  "{{item}}"
+    state: present
+  with_items:
+    - "{{puppet['packages']['pip']}}"
+  become: yes

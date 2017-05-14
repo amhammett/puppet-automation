@@ -1,0 +1,7 @@
+*.swp
+
+# ansible files
+*.retry
+
+# temp and cache
+tmp

@@ -1,0 +1,38 @@
+---
+- name: discover application instances
+  ec2_remote_facts:
+    filters:
+      instance-state-name: running
+      "tag:Environment":   "{{env}}"
+      "tag:Platform":      "{{platform}}"
+      "tag:Stack":         "{{stack}}"
+      vpc-id:              "{{meta_vpc_id}}"
+  environment: "{{environments}}"
+  register: ec2_remote_facts
+
+- name: define instances
+  set_fact: meta_puppet_instances="{{ec2_remote_facts|json_query('instances[].id')}}"
+
+- name: instance security group
+  ec2_group:
+    description: "elb access required for platform={{platform}} stack={{stack}} env={{env}}"
+    name:        "{{platform}}-{{env}}-{{stack}}-lb"
+    rules:       "{{elb_sg_rules}}"
+    vpc_id:      "{{meta_vpc_id}}"
+  environment: "{{environments}}"
+  register: ec2_group_elb
+
+- name: define elb security group
+  set_fact: meta_puppet_elb_sg="{{ec2_group_elb.group_id}}"
+
+- name: application elb
+  ec2_elb_lb:
+    instance_ids:       "{{meta_puppet_instances}}"
+    listeners:          "{{elb_listeners}}"
+    name:               "{{platform}}-{{env}}-{{stack}}-lb"
+    purge_instance_ids: true
+    security_group_ids: "{{meta_puppet_elb_sg}}"
+    state:              present
+    subnets:            "{{meta_private_subnets}}"
+  environment: "{{environments}}"
+  register: elb_instance

@@ -1,0 +1,22 @@
+---
+- name:  puppet master infrastructure provision and configuration
+  hosts: localhost
+
+  connection: local
+  gather_facts: no
+
+  vars_files:
+    - vars/common.yml
+    - vars/secrets.yml
+
+  vars:
+    environments:  "{{puppet_environments}}"
+    instance_type: "{{dyn_master_ec2_type}}"
+    sg_rules:      "{{dyn_master_sg_rules}}"
+    elb_listeners: "{{dyn_master_elb_listeners}}"
+    elb_sg_rules:  "{{dyn_master_elb_sg_rules}}"
+
+  roles:
+    - aws-vpc-facts
+    - { role: aws-ec2-instance, stack: "master" }
+    - { role: aws-elb, stack: "master" }

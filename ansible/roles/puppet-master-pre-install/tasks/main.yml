@@ -1,0 +1,33 @@
+---
+- name: discover puppet master elb
+  ec2_elb_facts:
+    names: "{{platform}}-{{env}}-master-lb"
+  environment: "{{environments}}"
+  register: elb_facts
+
+- name: define elb endpoint
+  set_fact: meta_puppet_elb_endpoint="{{elb_facts.elbs.0.hosted_zone_name}}"
+
+- name: puppet elb endpoint
+  debug: msg="meta_puppet_elb_endpoint={{meta_puppet_elb_endpoint}}"
+
+- name: puppet.conf requires dns alt names
+  lineinfile:
+    path:   /etc/puppet/puppet.conf
+    regexp: '^dns_alt_names'
+    line:   'dns_alt_names = puppet,{{meta_puppet_elb_endpoint}}'
+    mode:   0644
+  become: yes
+
+- name: check for elb ssl certificate
+  shell: >
+    puppet cert verify {{meta_puppet_elb_endpoint}}
+  become: yes
+  register: shell_puppet_cert_lookup
+  failed_when: shell_puppet_cert_lookup.rc == 1
+
+- name: generate elb ssl certificate
+  shell: >
+    puppet cert generate {{meta_puppet_elb_endpoint}}
+  become: yes
+  when: shell_puppet_cert_lookup.stderr.find('Could not find a certificate') != -1

@@ -1,0 +1,27 @@
+---
+- name: lookup vpc id
+  ec2_vpc_net_facts:
+    filters:
+      "tag:Role": target
+  environment: "{{environments}}"
+  register: ec2_vpc_lookup
+
+- name: define vpc id
+  set_fact: meta_vpc_id="{{ec2_vpc_lookup.vpcs[0].id}}"
+
+- name: lookup vpc subnets
+  ec2_vpc_subnet_facts:
+    filters:
+      vpc-id: "{{meta_vpc_id}}"
+  environment: "{{environments}}"
+  register: ec2_subnet_lookup
+
+- name: define subnets
+  set_fact: meta_vpc_subnets="{{ec2_subnet_lookup|json_query(private_subnet_query)}}"
+  vars:
+    private_subnet_query: "subnets[*].{id: id, zone: tags.Zone}"
+
+- name: define private subnets
+  set_fact: meta_private_subnets="{{meta_vpc_subnets|json_query(private_subnet_query)}}"
+  vars:
+    private_subnet_query: "[?zone=='private'].id"

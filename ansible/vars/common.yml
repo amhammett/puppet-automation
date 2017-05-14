@@ -1,0 +1,63 @@
+---
+
+platform: puppet
+
+# this is bad and you should change this to 
+meta_ssh_all_list: [ "0.0.0.0/0" ]
+
+# instance variables
+ec2:
+  master:
+    size: "50"
+    type: "t2.large"
+    sg_rules:
+      - proto:     tcp
+        from_port: 8140
+        to_port:   8140
+        cidr_ip:   0.0.0.0/0
+      - proto: tcp
+        from_port: 22
+        to_port:   22
+        cidr_ip:   "{{meta_ssh_all_list}}"
+
+dyn_master_ec2_type: "{{ec2['master']['type']}}"
+dyn_master_sg_rules: "{{ec2['master']['sg_rules']}}"
+
+elb:
+  master:
+    listeners:
+      - protocol:           http
+        load_balancer_port: "{{dyn_puppet_lb_port}}"
+        instance_port:      "{{dyn_puppet_app_port}}"
+    sg_rules:
+      - proto:     tcp
+        from_port: 80
+        to_port:   80
+        cidr_ip:   0.0.0.0/0
+
+dyn_master_elb_listeners: "{{elb['master']['listeners']}}"
+dyn_master_elb_sg_rules:  "{{elb['master']['sg_rules']}}"
+
+puppet_environments:
+    - AWS_ACCESS_KEY_ID:     "{{lookup('ini', 'aws_access_key_id section={{profile}} file=~/.aws/credentials')}}"
+    - AWS_SECRET_ACCESS_KEY: "{{lookup('ini', 'aws_secret_access_key section={{profile}} file=~/.aws/credentials')}}"
+    - AWS_DEFAULT_REGION:    "{{region}}"
+
+puppet:
+  packages:
+    apt:
+      - ntp
+      - ntpdate
+      - git
+      - puppet-master
+      - python-pip
+    pip:
+      - boto
+  ports:
+    loadbalancer: 80
+    application:  8140
+  version: pc1
+
+dyn_puppet_lb_port:  "{{puppet['ports']['loadbalancer']}}"
+dyn_puppet_app_port: "{{puppet['ports']['application']}}"
+dyn_puppet_version: "{{puppet['version']}}"
